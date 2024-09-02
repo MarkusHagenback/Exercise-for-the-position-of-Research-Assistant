@@ -1,8 +1,8 @@
+rm(list=ls()) # Removes everything from the work environment
 #########################################
 ##   Reading in the data from Github   ##
 #########################################
-rm(list=ls())
-# This makes it possible to only need this R-script to read the entire code
+# This approach makes it possible to only need this R-script to read the entire code
 # Thus, no need to copy the data-files etc.
 library(readxl) # Library needed to read in the file correctly
 
@@ -19,26 +19,36 @@ data <- read_excel(temp_file)
 # Delete the temporary file after use
 rm(temp_file)
 rm(url)
-
-#######################
-##   Data cleaning   ##
-#######################
+################################################################################
+#   Data cleaning
+################################################################################
 # Making date column as.date
 data$date <- as.Date(data$date, format = "%Y-%m-%d")  # Adjust format if needed
 
-# Rating column has some non-numeric values. Will remove these ones, as they do not contain any information for us, however, need to remember which one in order to improve the data collection for the future (to find what was the problem with this data collection)
+#############################################
+# Rating column has some non-numeric values # 
+#############################################
+#Will remove these ones (later), as they do not contain any information
 
 # Identify rows where 'average rating' is non-numeric
-troublesome_rows_non_numeric <- which(!grepl("^\\d+(\\.\\d+)?$", data$`average rating`))
+troublesome_rows_non_numeric <- which(!grepl("^\\d+(\\.\\d+)?$", data$`average rating`)) # Will remove later
 
 # Converting to numeric
 data$`average rating` <- as.numeric(data$`average rating`)
 
-# We also have some NA question(s), which needs to be removed, as these contains little information
+################
+# NA questions #
+################
+# Will be removed, as these contains little information
+
 # Identify rows where 'question' is NA
 troublesome_rows_question <- which(is.na(data$question))
 
-# Then we have question topic which is NA. But based on the information from other rows, we know what it should be
+########################
+# Question topic is NA # 
+########################
+# Based on the information from other rows, we know what it should be
+
 # Identify rows where 'question topic' is NA
 na_question_topic <- which(is.na(data$`question topic`))
 
@@ -58,10 +68,10 @@ for (i in na_question_topic) {
   }
 }
 
-# Combine all troublesome rows and remove duplicates
-troublesome_rows_all <- unique(c(troublesome_rows_non_numeric, troublesome_rows_question, na_question_topic))
+########################
+# Wrong question topic #
+########################
 
-##
 # Create a lookup table for the most common 'question topic' for each 'question'
 most_common_topics <- aggregate(`question topic` ~ question, data = data, function(x) {
   names(sort(table(x), decreasing = TRUE))[1]
@@ -75,8 +85,11 @@ troublesome_rows_wrong_topic <- integer(0)
 
 # Update rows where 'question topic' is different from the majority
 for (i in seq_len(nrow(data))) {
-  if (!(i %in% troublesome_rows_all)) {   # Check if the row index is not in the troublesome rows list
-    question_value <- data$question[i]
+  # Skip the row if 'question topic' or 'question' is NA (these are already fixed)
+  if (is.na(data$`question topic`[i]) || is.na(data$question[i])) {
+    next
+  }
+  question_value <- data$question[i]
     
     # Determine the correct 'question topic' from the lookup table
     correct_topic <- common_topic_lookup[question_value]
@@ -88,15 +101,49 @@ for (i in seq_len(nrow(data))) {
       # Update 'question topic' to the most common topic
       data$`question topic`[i] <- correct_topic
     }
-  }
 }
 
-# Combine all troublesome rows and remove duplicates
-troublesome_rows_all <- unique(c(troublesome_rows_all, troublesome_rows_wrong_topic))
+##############################
+# Creating a dataframe/table #
+##############################
+# For what we have done with the data, for the report
+
+# Create individual dataframes for each list with explanations
+df_na_question_topic <- data.frame(
+  RowNumber = na_question_topic,
+  Explanation = "NA question topic (Updated)"
+)
+
+df_wrong_topic <- data.frame(
+  RowNumber = troublesome_rows_wrong_topic,
+  Explanation = "Wrong question topic (Updated)"
+)
+
+df_non_numeric <- data.frame(
+  RowNumber = troublesome_rows_non_numeric,
+  Explanation = "Non numeric value in average rating (Removed)"
+)
+
+df_na_question <- data.frame(
+  RowNumber = troublesome_rows_question,
+  Explanation = "NA questions (Removed)"
+)
+  
+# Combine all dataframes into one
+df_combined <- rbind(df_na_question_topic, df_wrong_topic, df_non_numeric, df_na_question)
+
+# Some rows needs to be removed, insufficient data to analyse
+troublesome_rows_to_remove <- unique(c(troublesome_rows_non_numeric, troublesome_rows_question))
 
 # Removing these troublesome rows
-data <- data[-troublesome_rows_all, ]
+data <- data[-troublesome_rows_to_remove, ]
 
-##
+# Finally, there is some missing values for the other columns. 
+# However, it is still okay to use those rows for analysis. 
+# As these rows still contains information that is valuable. 
+# For instance, even if we don't know the sponsor organisation, 
+# we can still use the row to analyse virtual classes
 
-# Finally, it is some missing values for the other columns. However, it is still okay to use those rows for analysis. As this rows still containts information that is valuable. For instance, even if we dont know the sponsor organisation, we can still use the row to analyse virtual classes
+################################################################################
+#   End of data cleaning
+################################################################################

@@ -130,7 +130,7 @@ df_na_question <- data.frame(
 )
   
 # Combine all dataframes into one
-df_combined <- rbind(df_na_question_topic, df_wrong_topic, df_non_numeric, df_na_question)
+data_cleaning_table <- rbind(df_na_question_topic, df_wrong_topic, df_non_numeric, df_na_question)
 
 # Some rows needs to be removed, insufficient data to analyse
 troublesome_rows_to_remove <- unique(c(troublesome_rows_non_numeric, troublesome_rows_question))
@@ -144,6 +144,22 @@ data <- data[-troublesome_rows_to_remove, ]
 # For instance, even if we don't know the sponsor organisation, 
 # we can still use the row to analyse virtual classes
 
+################################################################################
+#                     Cleaning up the environment
+
+# Define the objects to keep
+objects_to_keep <- c("data", "data_cleaning_table")
+
+# Get a list of all objects in the environment
+all_objects <- ls()
+
+# Identify objects to remove (those not in the list of objects to keep)
+objects_to_remove <- setdiff(all_objects, objects_to_keep)
+
+# Remove the objects that are not in the keep list
+rm(list = objects_to_remove)
+rm(all_objects)
+rm(objects_to_remove)
 ################################################################################
 #   End of data cleaning
 ################################################################################

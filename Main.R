@@ -293,7 +293,7 @@ ggsave(filename = "density_plot_organisation.pdf",
 # Box plot of average ratings by question
 boxplot <- ggplot(data, aes(x = question, y = `average rating`, fill = question)) +
   geom_boxplot(outlier.size = 2, outlier.colour = "red") +
-  labs(title = "Distribution of Average Ratings by Question", 
+  labs(title = "", 
        x = NULL, 
        y = " ") +
   theme_minimal(base_size = 12) +

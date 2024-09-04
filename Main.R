@@ -1,10 +1,18 @@
 rm(list=ls()) # Removes everything from the work environment
 #########################################
+# Reading in libraries:
+library(readxl) # Library needed to read in the file correctly
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(tidyr)
+library(xtable)
+#########################################
 ##   Reading in the data from Github   ##
 #########################################
-# This approach makes it possible to only need this R-script to read the entire code
+# The approach in this code, by loading in data from Github, 
+# makes it possible to only need this R-script for everything.
 # Thus, no need to copy the data-files etc.
-library(readxl) # Library needed to read in the file correctly
 
 # URL of the raw file
 url <- "https://raw.githubusercontent.com/MarkusHagenback/Exercise-for-the-position-of-Research-Assistant/main/exercise.xlsx"
@@ -108,10 +116,10 @@ for (i in seq_len(nrow(data))) {
     }
 }
 
-##############################
-# Creating a dataframe/table #
-##############################
-# For what we have done with the data, for the report
+####################
+# Creating Table 1 #
+####################
+# For what we have done with the data, for the report (Table 1 in appendix)
 
 # Create individual dataframes for each list with explanations
 df_na_question_topic <- data.frame(
@@ -134,8 +142,18 @@ df_na_question <- data.frame(
   Explanation = "NA question (Removed)"
 )
   
-# Combine all dataframes into one
+# Combine all dataframes into one to have one table which specifies which rows are problematic
 data_cleaning_table <- rbind(df_na_question_topic, df_wrong_topic, df_non_numeric, df_na_question)
+
+# Making a nice latex table
+# Convert the data_cleaning_table dataframe to a LaTeX table format
+latex_table <- xtable(data_cleaning_table, caption = "Data Cleaning Steps", label = "tab:data_cleaning")
+
+# Print the LaTeX table code with custom title and centering
+print(latex_table, type = "latex", include.rownames = FALSE, 
+      caption.placement = "top", 
+      table.placement = "ht", 
+      sanitize.text.function = identity)
 
 # Some rows needs to be removed, insufficient data to analyse
 troublesome_rows_to_remove <- unique(c(troublesome_rows_non_numeric, troublesome_rows_question))
@@ -147,11 +165,10 @@ data <- data[-troublesome_rows_to_remove, ]
 # However, it is still okay to use those rows for analysis. 
 # As these rows still contains information that is valuable. 
 # For instance, even if we don't know the sponsor organisation, 
-# we can still use the row to analyse virtual classes
-
+# we can still use the row to analyse virtual classes.
 ################################################################################
 #                     Cleaning up the environment
-
+################################################################################
 # Define the objects to keep
 objects_to_keep <- c("data", "data_cleaning_table")
 
@@ -172,65 +189,213 @@ rm(objects_to_remove)
 ################################################################################
 #   Data analysis
 ################################################################################
-library(dplyr)
-library(ggplot2)
-library(lubridate)
-library(tidyr)
+
+######### Average values ######### 
 
 # Average rating by virtual vs. in-person
 virtual_vs_inperson <- data %>%
+  filter(!is.na(`course was virtual`)) %>%
   group_by(`course was virtual`) %>%
   summarise(avg_rating = mean(`average rating`, na.rm = TRUE))
 
 # Average rating by sponsor organization
 rating_by_sponsor <- data %>%
+  filter(!is.na(`sponsoring organisation`)) %>%
   group_by(`sponsoring organisation`) %>%
   summarise(avg_rating = mean(`average rating`, na.rm = TRUE))
 
+# Average rating by `question topic`
+rating_by_sponsor <- data %>%
+  filter(!is.na(`question topic`)) %>%
+  group_by(`question topic`) %>%
+  summarise(avg_rating = mean(`average rating`, na.rm = TRUE))
+
+######### Figure 1 ######### 
+# Calculate the mean of the 'average rating' column
+mean_rating <- mean(data$`average rating`, na.rm = TRUE)
+
+# Create a density plot for the 'average rating' column
+density_plot<- ggplot(data, aes(x = `average rating`)) +
+  geom_density(fill = "#2C3E50", color = "#2C3E50", alpha = 0.7) +  
+  geom_vline(aes(xintercept = mean_rating), 
+             color = "red", linetype = "dashed", size = 1) +  # Add a dashed red line for the mean
+  annotate("text", x = mean_rating, y = 0.4,  
+           label = paste("Mean:", round(mean_rating, 2)), 
+           color = "red", hjust = -0.1, vjust = -0.7, size = 4, fontface = "italic") +  
+  labs(title = "",
+       x = "",
+       y = "") +
+  theme_minimal(base_size = 14) + 
+  theme(
+  )
+
+# Save the plot to a PDF file in the current working directory
+ggsave(filename = "density_plot_with_mean.pdf",
+       plot = density_plot,                     
+       width = 8,                               
+       height = 6,                              
+       device = "pdf")   
+
+######### Figure 2 ######### 
+# Filter out rows where 'course was virtual' is NA
+filtered_data <- data %>% filter(!is.na(`course was virtual`))
+
+# Create a density plot for 'average rating', divided by 'course was virtual'
+density_plot_virtual <- ggplot(filtered_data, aes(x = `average rating`, fill = `course was virtual`)) +
+  geom_density(alpha = 0.7) +  
+  geom_vline(aes(xintercept = mean_rating), 
+             color = "red", linetype = "dashed", size = 1) +  # Add a dashed red line for the mean
+  annotate("text", x = mean_rating, y = 0.4,  
+           label = paste("Mean:", round(mean_rating, 2)), 
+           color = "red", hjust = -0.1, vjust = -0.7, size = 4, fontface = "italic") +  
+  labs(title = "",
+       x = "",
+       y = "",
+       fill = "Course Type") +
+  theme_minimal(base_size = 14) + 
+  theme(legend.position = "bottom")
+
+# Save the plot
+ggsave(filename = "density_plot_virtual.pdf",  
+       plot = density_plot_virtual,                   
+       width = 8,                                   
+       height = 6,                                  
+       device = "pdf")
+
+######### Figure 3 ######### 
+# Filter out rows where `sponsoring organisation` is NA
+filtered_data <- data %>% filter(!is.na(`sponsoring organisation`))
+
+# Create a density plot for 'average rating', divided by 'sponsoring organisation'
+density_plot_organisation <- ggplot(filtered_data, aes(x = `average rating`, fill = `sponsoring organisation`)) +
+  geom_density(alpha = 0.7) +  
+  geom_vline(aes(xintercept = mean_rating), 
+             color = "red", linetype = "dashed", size = 1) +  # Add a dashed red line for the mean
+  annotate("text", x = mean_rating, y = 0.4,  
+           label = paste("Mean:", round(mean_rating, 2)), 
+           color = "red", hjust = -0.1, vjust = -0.7, size = 4, fontface = "italic") +  
+  labs(title = "",
+       x = "",
+       y = "",
+       fill = "Organisation") +
+  theme_minimal(base_size = 14) + 
+  theme(legend.position = "bottom")
+
+# Save the plot
+ggsave(filename = "density_plot_organisation.pdf",  
+       plot = density_plot_organisation,                   
+       width = 8,                                   
+       height = 6,                                  
+       device = "pdf")
+
+######### Figure 4 ######### 
+
+# Box plot of average ratings by question
+boxplot <- ggplot(data, aes(x = question, y = `average rating`, fill = question)) +
+  geom_boxplot(outlier.size = 2, outlier.colour = "red") +
+  labs(title = "Distribution of Average Ratings by Question", 
+       x = NULL, 
+       y = " ") +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_blank(),             
+        axis.ticks.x = element_blank(),            
+        legend.position = "bottom",                
+        legend.title = element_blank(),            
+        legend.text = element_text(size = 7)) +    
+  guides(fill = guide_legend(ncol = 2))           
+
+ggsave(filename = "box_plot_by_question.pdf",
+       plot = boxplot,                     
+       width = 8,                               
+       height = 6,                              
+       device = "pdf")   
+
+######### Figure 5 ######### 
 # Trends over time
 # Aggregate by date: Average rating per date
 daily_avg_rating <- data %>%
+  filter(!is.na(date)) %>%
   group_by(date) %>%
   summarise(avg_rating = mean(`average rating`, na.rm = TRUE))
 
-# Plotting the average rating over time (by day)
-ggplot(daily_avg_rating, aes(x = date, y = avg_rating)) +
-  geom_line() +
-  labs(title = "Average Rating Over Time (by Date)", x = "Date", y = "Average Rating")
-# Comment: Low rating at: 2019-03-24 (4.125).
+# Plotting the average rating over time (by day) 
+average_per_day <- ggplot(daily_avg_rating, aes(x = date, y = avg_rating)) +
+  geom_line(color = "#4D4D4D", size = 1) +  
+  geom_point(data = subset(daily_avg_rating, date == as.Date("2019-03-24")), 
+             aes(x = date, y = avg_rating), 
+             color = "red", size = 4) +  # Highlight the low rating point
+  annotate("text", x = as.Date("2019-03-24"), y = 4.2, 
+           label = "Low Rating: 4.125", 
+           color = "red", hjust = -0.1, vjust = -0.7, size = 4, fontface = "italic") +  
+  geom_hline(yintercept = mean(daily_avg_rating$avg_rating, na.rm = TRUE), 
+             linetype = "dashed", color = "darkgrey", size = 0.7) +  # Add horizontal line at the average
+  labs(title = "", 
+       x = "", 
+       y = "") +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "3 months") +  
+  theme_minimal(base_size = 14) +  
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),  
+    axis.title = element_text(face = "bold", size = 14),  
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 12),
+    axis.text.y = element_text(size = 12), 
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank()   
+  )
 
-#######################
+ggsave(filename = "average_per_day.pdf",
+       plot = average_per_day,                     
+       width = 8,                               
+       height = 6,                              
+       device = "pdf") 
+
+######### Figure 6 ######### 
 # Evolution of Question Topics Over Time:
 
 # Would be easier to understand if we would like week-by-week basis
-
 # Aggregating by week and question topic
 data$week <- floor_date(data$date, "week")
 
 weekly_topic_rating <- data %>%
+  filter(!is.na(`question topic`)) %>%
   group_by(week, `question topic`) %>%
   summarise(avg_rating = mean(`average rating`, na.rm = TRUE))
 
-# Plotting the evolution of question topics over time
-ggplot(weekly_topic_rating, aes(x = week, y = avg_rating, color = `question topic`)) +
-  geom_line() +
-  labs(title = "Evolution of Question Topics Over Time", x = "Week", y = "Average Rating", color = "Question Topic")
-# Comment: Very low value for presentation methods at: 2019-03-24 (3.95)
+weekly_topic_ratings <- ggplot(weekly_topic_rating, aes(x = week, y = avg_rating)) +
+  geom_line(color = "black", size = 0.8) +  
+  geom_point(size = 0.9) +  
+  labs(title = "", 
+       x = "", 
+       y = "") +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "6 months") + 
+  theme_minimal(base_size = 14) +  
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),  
+    axis.text.x = element_text(angle = 45, hjust = 1),  
+    axis.title = element_text(face = "bold"),  
+    legend.position = "none"  
+  ) +
+  facet_wrap(~`question topic`, scales = "fixed")  # Create individual panels for each question topic
+
+ggsave(filename = "weekly_question_topic.pdf",
+       plot = weekly_topic_ratings,                     
+       width = 8,                               
+       height = 6,                              
+       device = "pdf") 
 
 #################
-
 # Aggregating by week and question
 weekly_question_rating <- data %>%
   group_by(week, question) %>%
   summarise(avg_rating = mean(`average rating`, na.rm = TRUE))
 
+# This is too messy to see what is happening. Not using this graph in the report.
 # Plotting the evolution of specific questions over time
 ggplot(weekly_question_rating, aes(x = week, y = avg_rating, color = question)) +
   geom_line() +
   labs(title = "Evolution of Specific Questions Over Time", x = "Week", y = "Average Rating", color = "Question")
 # Comment: Low ratings at: 2019-03-24 (3.60) for "Lecturers encouraged discussion and participation"
 # Comment: Low ratings at: 2017-05-21 (3.90) for "The session with the participants' presentations was useful"
-
 ###########################################
 # Evolution of Virtual Courses Over Time:
 
@@ -257,6 +422,7 @@ ggplot(weekly_virtual_rating, aes(x = week, y = avg_rating, color = `course was 
   geom_line() +
   labs(title = "Average Rating for Virtual vs In-Person Courses Over Time", x = "Week", y = "Average Rating", color = "Virtual")
 
+######### Figure 7 ######### 
 # Calculate weekly average rating for each question, split by virtual/non-virtual
 weekly_question_rating <- data %>%
   filter(!is.na(date), !is.na(`course was virtual`)) %>%
@@ -264,13 +430,28 @@ weekly_question_rating <- data %>%
   summarise(avg_rating = mean(`average rating`, na.rm = TRUE))
 
 # Each unique question over time
-ggplot(weekly_question_rating, aes(x = week, y = avg_rating, color = `course was virtual`)) +
-  geom_line() +
-  facet_wrap(~question) +
-  labs(title = "Average Rating for Virtual vs In-Person Courses Over Time",
-       x = "Week", y = "Average Rating", color = "Virtual") +
-  theme_minimal()
+questions_over_time_rating <- ggplot(weekly_question_rating, aes(x = week, y = avg_rating, color = `course was virtual`)) +
+  geom_line(size = 0.9) +  
+  facet_wrap(~question, scales = "fixed", ncol = 2) +  
+  labs(title = "",
+       x = "", 
+       y = "", 
+       color = "Course Type") +  
+  scale_x_date(date_labels = "%b %Y", date_breaks = "6 months") +  
+  theme_minimal(base_size = 8) +  
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),  
+    axis.text.x = element_text(angle = 45, hjust = 1),  
+    legend.position = "bottom",  
+    strip.text = element_text(face = "bold")  
+  )
 
+# Saving down
+ggsave(filename = "questions_over_time_rating.pdf",
+       plot = questions_over_time_rating,                     
+       width = 8,                               
+       height = 6,                              
+       device = "pdf")
 ############################
 # Table for each question, virtual vs non-virtual
 # Calculate the average rating for each question, split by virtual/non-virtual
@@ -284,6 +465,7 @@ question_comparison <- data %>%
 question_comparison_table <- question_comparison %>%
   pivot_wider(names_from = `course was virtual`, 
               values_from = c(avg_rating, count))
+
 ############################
 # Now to look at interaction between organisation and virtual
 
@@ -298,15 +480,15 @@ interaction_data <- data %>%
 ggplot(interaction_data, aes(x = `course was virtual`, y = avg_rating, fill = `course was virtual`)) +
   geom_bar(stat = "identity", position = "dodge") +
   facet_wrap(~ `sponsoring organisation`, scales = "free_x") +
-  labs(title = "Average Ratings for Virtual vs. In-Person Courses by Sponsoring Organization",
+  labs(title = "",
        x = "Course Type", y = "Average Rating", fill = "Course Type") +
   theme_minimal() +
-  theme(axis.text.x = element_blank(),  # Remove x-axis labels
-        axis.ticks.x = element_blank(),  # Remove x-axis ticks
-        strip.text = element_text(size = 10))  # Adjust facet labels
+  theme(axis.text.x = element_blank(),  
+        axis.ticks.x = element_blank(),  
+        strip.text = element_text(size = 10))  
 
-##############################
-# Each sponsorings organisation evultion over time
+######### Figure 8 ######### 
+# Each sponsoring organisation evolution over time
 
 # Aggregate data by sponsoring organization and date
 rating_trends <- data %>%
@@ -315,11 +497,30 @@ rating_trends <- data %>%
   summarise(avg_rating = mean(`average rating`, na.rm = TRUE)) %>%
   ungroup()
 
-ggplot(rating_trends, aes(x = date, y = avg_rating, color = `sponsoring organisation`)) +
-  geom_line(size = 1) +  # Line plot for trends
-  geom_point(size = 2) +  # Points on the lines for visibility
-  labs(title = "Average Course Ratings Over Time by Sponsoring Organization",
-       x = "Date", y = "Average Rating", color = "Sponsoring Organization") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x-axis labels for better readability
-        strip.text = element_text(size = 10))  # Adjust facet labels if needed
+sponsoring_over_time <- ggplot(rating_trends, aes(x = date, y = avg_rating)) +
+  geom_line(color = "black", size = 0.8) +  
+  geom_point(size = 2) +
+  labs(title = "",
+       x = "", 
+       y = "", 
+       color = "Sponsoring Organization") +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "4 months") + 
+  theme_minimal(base_size = 14) +  
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),  
+    axis.text.x = element_text(angle = 45, hjust = 1),  
+    axis.title = element_text(face = "bold"),  
+    legend.position = "none"
+  ) +
+  facet_wrap(~`sponsoring organisation`, scales = "fixed")  # Create individual panels for each organization
+
+# Saving down
+ggsave(filename = "sponsoring_over_time.pdf",
+       plot = sponsoring_over_time,                     
+       width = 8,                               
+       height = 6,                              
+       device = "pdf")
+
+################################################################################
+#   End of Data analysis & End of the R-code
+################################################################################
